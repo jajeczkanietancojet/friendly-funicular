@@ -1,0 +1,12 @@
+Dodaj poniższe klucze do Info.plist projektu iOS (Target > Info).
+W Xcode dla UIBackgroundModes dodaj element tablicy: location.
+
+API_BASE_URL (String) = https://twoj-backend.pl
+NSLocationWhenInUseUsageDescription (String) = Lokalizacja jest używana do udostępniania klientowi trasy spaceru z psem.
+NSLocationAlwaysAndWhenInUseUsageDescription (String) = Podczas aktywnego spaceru aplikacja przekazuje trasę także wtedy, gdy ekran iPhone’a jest zablokowany.
+NSLocationAlwaysUsageDescription (String) = Podczas aktywnego spaceru aplikacja przekazuje trasę także wtedy, gdy ekran iPhone’a jest zablokowany.
+UIBackgroundModes (Array) = location
+
+Nie dodawaj NSAllowsArbitraryLoads w aplikacji produkcyjnej. Używaj HTTPS.
+Jeżeli testujesz lokalny serwer po HTTP, dodaj w ustawieniach ATS wyjątek wyłącznie dla
+konkretnego hosta developerskiego i usuń go przed publikacją.
