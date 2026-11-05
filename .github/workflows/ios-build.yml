@@ -21,9 +21,14 @@ jobs:
 
       - name: Install XcodeGen
         run: brew install xcodegen
-
+        
       - name: Generate Xcode project
-        run: xcodegen generate
+        run: |
+          pwd
+          ls -la
+          xcodegen version
+          xcodegen generate
+          ls -la NaSpacerze.xcodeproj
 
       - name: Build iOS app
         run: |
