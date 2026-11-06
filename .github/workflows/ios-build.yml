@@ -1,4 +1,5 @@
-name: Build iOS App
+
+name: Build iOS App for iPhone
 
 on:
   workflow_dispatch:
@@ -21,28 +22,30 @@ jobs:
 
       - name: Install XcodeGen
         run: brew install xcodegen
-        
-      - name: Generate Xcode project
-        run: |
-          pwd
-          ls -la
-          xcodegen version
-          xcodegen generate
-          ls -la NaSpacerze.xcodeproj
 
-      - name: Build iOS app
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build for iPhone device
         run: |
           xcodebuild \
             -project NaSpacerze.xcodeproj \
             -scheme NaSpacerze \
-            -sdk iphonesimulator \
+            -sdk iphoneos \
             -configuration Release \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
             build
 
-      - name: Upload app
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/NaSpacerze.app Payload/
+          zip -r NaSpacerze.ipa Payload
+
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: NaSpacerze-iOS
-          path: build/Build/Products/Release-iphonesimulator/NaSpacerze.app
+          name: NaSpacerze-IPA
+          path: NaSpacerze.ipa
