@@ -27,4 +27,5 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "Aplikacja wykorzystuje lokalizację podczas spaceru z psem."
         CODE_SIGNING_ALLOWED: NO
-        INFOPLIST_KEY_API_BASE_URL: "http://192.168.1.174:5000"
+        INFOPLIST_KEY_API_BASE_URL: "http://192.168.1.173:5000"
+        INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads: YES
