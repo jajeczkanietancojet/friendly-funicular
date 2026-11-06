@@ -609,7 +609,9 @@ private struct BookingFormView: View {
             pets = try await APIClient.shared.request("GET", "pets").objects("pets")
             pricing = try await APIClient.shared.request("GET", "availability/pricing").objects("pricing")
             if petID.isEmpty { petID = pets.first?.text("id") ?? "" }
-        } catch { error = error.localizedDescription }
+        } catch {
+    self.error = error.localizedDescription
+}
     }
 
     private func submit() async {
@@ -630,7 +632,9 @@ private struct BookingFormView: View {
                 "consent_parental": parentalConsent
             ])
             onCreated()
-        } catch { error = error.localizedDescription }
+        } catch {
+    self.error = error.localizedDescription
+}
     }
 }
 
@@ -711,7 +715,9 @@ private struct PetFormView: View {
                 "leash_info": leash, "notes": notes
             ])
             onCreated()
-        } catch { error = error.localizedDescription }
+        } catch {
+    self.error = error.localizedDescription
+}
     }
 }
 
@@ -857,7 +863,9 @@ private struct ChatView: View {
             _ = try await APIClient.shared.request("POST", "messages/\(bookingID)", body: ["content": content])
             input = ""
             await load()
-        } catch { error = error.localizedDescription }
+        } catch {
+    self.error = error.localizedDescription
+}
     }
 }
 
@@ -932,6 +940,8 @@ private struct WalkTrackingView: View {
         do {
             points = try await APIClient.shared.request("GET", "walks/\(bookingID)").objects("points")
             error = nil
-        } catch { error = error.localizedDescription }
+       } catch {
+    self.error = error.localizedDescription
+}
     }
 }
