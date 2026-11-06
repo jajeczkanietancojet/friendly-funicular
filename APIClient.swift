@@ -7,10 +7,14 @@ final class APIClient {
     static let shared = APIClient()
     private init() {}
 
-    private var baseURL: String {
-        let value = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String
-        return (value ?? "https://twoj-backend.example.com").trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-    }
+private var baseURL: String {
+    let value = Bundle.main.object(
+        forInfoDictionaryKey: "API_BASE_URL"
+    ) as? String
+
+    return (value ?? "http://192.168.1.173:5000")
+        .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+}
 
     func request(
         _ method: String = "GET",
