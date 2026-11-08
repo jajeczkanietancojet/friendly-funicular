@@ -51,6 +51,7 @@ private var baseURL: String {
             let message = json["message"] as? String ?? "Błąd HTTP \(http.statusCode)."
             throw APIError.http(status: http.statusCode, message: message)
         }
+        guard !json.isEmpty else { throw APIError.message("Serwer zwrócił nieprawidłową odpowiedź JSON.") }
         return json
     }
 }

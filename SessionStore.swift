@@ -84,7 +84,13 @@ final class SessionStore: ObservableObject {
         errorMessage = nil
     }
 
+    func reloadUser() async throws {
+        let response = try await APIClient.shared.request("GET", "auth/me")
+        if let json = response["user"] as? [String: Any] { user = AppUser(json: json) }
+    }
+
     func logout() {
+        NotificationCenter.default.post(name: Notification.Name("NaSpacerze.logout"), object: nil)
         KeychainToken.delete()
         user = nil
     }

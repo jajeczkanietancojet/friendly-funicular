@@ -6,7 +6,7 @@ private enum AppStyle {
     static let mint = Color(red: 0.91, green: 0.95, blue: 0.92)
     static let ink = Color(red: 0.12, green: 0.20, blue: 0.17)
     static let muted = Color(red: 0.45, green: 0.51, blue: 0.47)
-    static let canvas = Color(red: 0.96, green: 0.97, blue: 0.95)
+    static let canvas = Color(red: 0.97, green: 0.97, blue: 0.94)
 }
 
 struct ContentView: View {
@@ -24,6 +24,7 @@ struct ContentView: View {
             }
         }
         .tint(AppStyle.green)
+        .preferredColorScheme(.light)
         .task { await session.restore() }
     }
 }
@@ -74,6 +75,7 @@ private struct AuthView: View {
                                 .keyboardType(.emailAddress)
                                 .textContentType(.emailAddress)
                                 .autocorrectionDisabled()
+                            LegalLinksView()
                             SecureField("Hasło", text: $password)
                                 .textContentType(isRegister ? .newPassword : .password)
                             if let error {
@@ -203,8 +205,11 @@ private struct MainTabView: View {
             .tag(4)
         }
         .task {
-            locationManager.resumeSavedWalkIfNeeded()
-            await refresh()
+            if user.isStaff { locationManager.resumeSavedWalkIfNeeded() }
+            while !Task.isCancelled {
+                await refresh()
+                do { try await Task.sleep(for: .seconds(30)) } catch { break }
+            }
         }
         .refreshable { await refresh() }
         .sheet(isPresented: $showBookingForm) {
@@ -266,14 +271,31 @@ private struct DashboardView: View {
     let activeWalk: [String: Any]?
     let onBook: () -> Void
     let onRefresh: () async -> Void
+    private var displayedBookings: [[String: Any]] {
+        if user.isStaff { return Array(bookings.prefix(4)) }
+        return Array(bookings.filter { ["pending", "confirmed", "scheduled", "in_progress"].contains($0.text("status")) }
+            .sorted { $0.text("scheduled_date") + $0.text("scheduled_time") < $1.text("scheduled_date") + $1.text("scheduled_time") }.prefix(4))
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("Cześć, \(user.firstName)! 👋").font(.title.bold()).foregroundStyle(AppStyle.ink)
-                    Text(user.isStaff ? "Panel opiekuna" : "Strefa klienta").foregroundStyle(AppStyle.muted)
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        Text("NA DOBRY DZIEŃ • NA DOBRY SPACER").font(.caption2.bold()).tracking(1)
+                        Spacer()
+                        Image(systemName: "pawprint.fill").font(.title2)
+                    }.foregroundStyle(.white.opacity(0.75))
+                    Text("Cześć, \(user.firstName)!").font(.largeTitle.bold()).foregroundStyle(.white)
+                    Text(user.isStaff ? "Zadbajmy dziś o dobre spacery." : "Twój pies. Dobre spacery. Spokojna głowa.")
+                        .foregroundStyle(.white.opacity(0.85))
+                    if !user.isStaff {
+                        NavigationLink { SubscriptionsView() } label: { Label("Odkryj pakiety spacerów", systemImage: "arrow.up.right").font(.subheadline.bold()).foregroundStyle(.white) }
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(24)
+                .background(LinearGradient(colors: [AppStyle.green, Color(red: 0.26, green: 0.49, blue: 0.38)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 28))
                 if user.isStaff {
                     HStack(spacing: 10) {
                         StatTile(title: "Nowe", value: stats.text("pendingCount", fallback: "0"), icon: "bell.badge")
@@ -313,7 +335,7 @@ private struct DashboardView: View {
                 if bookings.isEmpty {
                     ContentUnavailableView("Brak rezerwacji", systemImage: "calendar", description: Text(user.isStaff ? "Nowe zlecenia pojawią się tutaj." : "Gdy zarezerwujesz spacer, zobaczysz go w tym miejscu."))
                 } else {
-                    ForEach(Array(bookings.prefix(4).enumerated()), id: \.offset) { _, item in
+                    ForEach(Array(displayedBookings.enumerated()), id: \.offset) { _, item in
                         BookingSummaryCard(booking: item)
                     }
                 }
@@ -415,19 +437,25 @@ private struct BookingDetailView: View {
     @State private var error: String?
     @State private var busy = false
 
-    private var bookingID: String { booking.text("id") }
-    private var petName: String { (booking["pet"] as? [String: Any])?.text("name", fallback: "Pies") ?? booking.text("pet_name", fallback: "Pies") }
+    @State private var updatedBooking: [String: Any]?
+    @State private var cancelling = false
+    @State private var reason = ""
+    private var current: [String: Any] { updatedBooking ?? booking }
+    private var bookingID: String { current.text("id") }
+    private var petName: String { (current["pet"] as? [String: Any])?.text("name", fallback: "Pies") ?? current.text("pet_name", fallback: "Pies") }
 
     var body: some View {
         List {
             Section("Szczegóły spaceru") {
                 LabeledContent("Pies", value: petName)
-                LabeledContent("Termin", value: "\(booking.text("scheduled_date")) • \(booking.text("scheduled_time"))")
-                LabeledContent("Czas", value: "\(booking.text("duration_minutes")) min")
-                LabeledContent("Cena", value: "\(booking.text("price_pln")) zł")
-                LabeledContent("Adres odbioru", value: booking.text("pickup_address", fallback: "—"))
-                LabeledContent("Status", value: booking.text("status"))
-                if !booking.text("notes").isEmpty { Text(booking.text("notes")) }
+                LabeledContent("Termin", value: "\(current.text("scheduled_date")) • \(current.text("scheduled_time"))")
+                LabeledContent("Czas", value: "\(current.text("duration_minutes")) min")
+                LabeledContent("Cena", value: "\(current.text("price_pln")) zł")
+                LabeledContent("Adres odbioru", value: current.text("pickup_address", fallback: "—"))
+                LabeledContent("Status", value: current.text("status"))
+                if !current.text("notes").isEmpty { Text(current.text("notes")) }
+                if !current.text("subscription_id").isEmpty { Label("Rozliczenie w pakiecie", systemImage: "pawprint.fill") }
+                if !current.text("cancellation_reason").isEmpty { Text("Powód: \(current.text("cancellation_reason"))") }
             }
 
             Section("Kontakt i trasa") {
@@ -445,7 +473,7 @@ private struct BookingDetailView: View {
 
             if isStaff {
                 Section("Panel opiekuna") {
-                    if booking.text("status") == "in_progress" {
+                    if current.text("status") == "in_progress" {
                         Button {
                             Task { await endWalk() }
                         } label: {
@@ -455,29 +483,30 @@ private struct BookingDetailView: View {
                         if locationManager.isTracking {
                             Label(locationManager.statusMessage, systemImage: "location.fill")
                                 .font(.footnote).foregroundStyle(AppStyle.green)
-                        } else {
+                            Button("Wyłącz GPS") { locationManager.stop() }
+                        } else if current["location_enabled"] as? Bool != false {
                             Button {
-                                locationManager.start(bookingID: bookingID)
+                                if current["location_enabled"] as? Bool != false { locationManager.start(bookingID: bookingID) }
                             } label: {
                                 Label("Wznów / włącz GPS w tle", systemImage: "location.circle")
                             }
                         }
-                    } else {
+                    } else if ["pending", "confirmed", "scheduled"].contains(current.text("status")) {
                         Button { Task { await updateStatus("confirmed") } } label: {
                             Label("Potwierdź rezerwację", systemImage: "checkmark.circle")
                         }
-                        Button { Task { await startWalk() } } label: {
-                            Label("Rozpocznij spacer i GPS", systemImage: "figure.walk")
+                        if ["confirmed", "scheduled"].contains(current.text("status")) {
+                            Button { Task { await startWalk() } } label: {
+                                Label("Rozpocznij spacer", systemImage: "figure.walk")
+                            }.disabled(busy)
                         }
-                        Button(role: .destructive) { Task { await updateStatus("cancelled") } } label: {
-                            Label("Anuluj zlecenie", systemImage: "xmark.circle")
-                        }
+                        Button("Nie mogę przyjść", role: .destructive) { reason = ""; cancelling = true }
                     }
                 }
-            } else if !["completed", "cancelled", "in_progress"].contains(booking.text("status")) {
+            } else if !["completed", "cancelled", "in_progress"].contains(current.text("status")) {
                 Section {
                     Button("Anuluj rezerwację", role: .destructive) {
-                        Task { await cancelBooking() }
+                        reason = ""; cancelling = true
                     }
                     .disabled(busy)
                 }
@@ -485,17 +514,29 @@ private struct BookingDetailView: View {
 
             if let error { Text(error).foregroundStyle(.red) }
         }
+        .disabled(busy)
+        .task { await reload() }
+        .alert(isStaff ? "Nie mogę przyjść" : "Odwołaj spacer", isPresented: $cancelling) {
+            TextField("Powód", text: $reason)
+            Button("Odwołaj i powiadom", role: .destructive) { Task { await cancelBooking() } }.disabled(reason.trimmingCharacters(in: .whitespaces).count < 3 || busy)
+            Button("Wróć", role: .cancel) { }
+        } message: { Text("Spacer zostanie odwołany. Druga strona otrzyma powiadomienie; spacer z pakietu wróci do salda.") }
         .navigationTitle("Szczegóły")
         .navigationBarTitleDisplayMode(.inline)
         .overlay { if busy { ProgressView().padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14)) } }
     }
 
+    private func reload() async {
+        do { updatedBooking = try await APIClient.shared.request("GET", "bookings/\(bookingID)")["booking"] as? [String: Any] }
+        catch { self.error = error.localizedDescription }
+    }
     private func startWalk() async {
         busy = true; error = nil
         defer { busy = false }
         do {
             _ = try await APIClient.shared.request("POST", "walks/\(bookingID)/start", body: [:])
-            locationManager.start(bookingID: bookingID)
+            if current["location_enabled"] as? Bool != false { locationManager.start(bookingID: bookingID) }
+            await reload()
             await onChanged()
         } catch { self.error = error.localizedDescription }
     }
@@ -504,8 +545,10 @@ private struct BookingDetailView: View {
         busy = true; error = nil
         defer { busy = false }
         do {
+            if locationManager.isTracking { try await locationManager.flushBeforeEnding() }
             _ = try await APIClient.shared.request("POST", "walks/\(bookingID)/end", body: [:])
             locationManager.stop()
+            await reload()
             await onChanged()
         } catch { self.error = error.localizedDescription }
     }
@@ -515,6 +558,7 @@ private struct BookingDetailView: View {
         defer { busy = false }
         do {
             _ = try await APIClient.shared.request("PATCH", "admin/bookings/\(bookingID)/status", body: ["status": status])
+            await reload()
             await onChanged()
         } catch { self.error = error.localizedDescription }
     }
@@ -523,7 +567,8 @@ private struct BookingDetailView: View {
         busy = true; error = nil
         defer { busy = false }
         do {
-            _ = try await APIClient.shared.request("POST", "bookings/\(bookingID)/cancel", body: ["reason": "Anulowano w aplikacji iOS"])
+            _ = try await APIClient.shared.request("POST", isStaff ? "admin/bookings/\(bookingID)/unavailable" : "bookings/\(bookingID)/cancel", body: ["reason": reason])
+            await reload()
             await onChanged()
         } catch { self.error = error.localizedDescription }
     }
@@ -539,18 +584,20 @@ private struct BookingFormView: View {
     @State private var petID = ""
     @State private var date = Calendar.current.date(byAdding: .day, value: 1, to: .now) ?? .now
     @State private var time = Calendar.current.date(bySettingHour: 10, minute: 0, second: 0, of: .now) ?? .now
-    @State private var duration = 45
+    @State private var duration = 30
     @State private var address = ""
     @State private var notes = ""
     @State private var terms = false
     @State private var locationConsent = false
     @State private var parentalConsent = false
+    @State private var earlyService = false
+    @State private var usePackage = false
     @State private var loading = false
     @State private var error: String?
 
     private var price: String {
         let item = pricing.first { Int($0.number("duration")) == duration }
-        return item.map { "\(Int($0.number("price"))) zł" } ?? ([30: "40 zł", 45: "55 zł", 60: "70 zł"][duration] ?? "—")
+        return item.map { "\(Int($0.number("price"))) zł" } ?? ([15: "10 zł", 30: "20 zł", 45: "30 zł", 60: "40 zł"][duration] ?? "—")
     }
 
     var body: some View {
@@ -568,17 +615,21 @@ private struct BookingFormView: View {
                     DatePicker("Data", selection: $date, in: Date()..., displayedComponents: .date)
                     DatePicker("Godzina", selection: $time, displayedComponents: .hourAndMinute)
                     Picker("Długość spaceru", selection: $duration) {
+                        Text("15 minut").tag(15)
                         Text("30 minut").tag(30)
                         Text("45 minut").tag(45)
                         Text("60 minut").tag(60)
                     }
-                    LabeledContent("Cena", value: price)
+                    LabeledContent("Cena", value: usePackage && duration == 30 ? "1 spacer z pakietu" : price)
+                    if duration == 30 { Toggle("Użyj aktywnego pakietu", isOn: $usePackage) }
                 }
                 Section("Odbiór") {
                     TextField("Dokładny adres odbioru", text: $address)
                     TextField("Uwagi dla opiekuna", text: $notes, axis: .vertical)
                 }
                 Section("Zgody") {
+                    LegalLinksView()
+                    Toggle("Żądam rozpoczęcia usługi przed upływem 14 dni. Po pełnym wykonaniu za moją zgodą utracę prawo odstąpienia od tej usługi.", isOn: $earlyService)
                     Toggle("Akceptuję regulamin (wymagane)", isOn: $terms)
                     Toggle("Zgoda na lokalizację podczas spaceru", isOn: $locationConsent)
                     Toggle("Zgoda rodzica/opiekuna prawnego", isOn: $parentalConsent)
@@ -601,6 +652,7 @@ private struct BookingFormView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Zamknij") { dismiss() } } }
             .task { await loadFormData() }
+            .environment(\.timeZone, TimeZone(identifier: "Europe/Warsaw") ?? .current)
         }
     }
 
@@ -617,8 +669,8 @@ private struct BookingFormView: View {
     private func submit() async {
         loading = true; error = nil
         defer { loading = false }
-        let dateFormatter = DateFormatter(); dateFormatter.dateFormat = "yyyy-MM-dd"
-        let timeFormatter = DateFormatter(); timeFormatter.dateFormat = "HH:mm"
+        let dateFormatter = DateFormatter(); dateFormatter.locale = Locale(identifier: "en_US_POSIX"); dateFormatter.timeZone = TimeZone(identifier: "Europe/Warsaw"); dateFormatter.dateFormat = "yyyy-MM-dd"
+        let timeFormatter = DateFormatter(); timeFormatter.locale = Locale(identifier: "en_US_POSIX"); timeFormatter.timeZone = TimeZone(identifier: "Europe/Warsaw"); timeFormatter.dateFormat = "HH:mm"
         do {
             _ = try await APIClient.shared.request("POST", "bookings", body: [
                 "pet_id": petID,
@@ -629,7 +681,9 @@ private struct BookingFormView: View {
                 "notes": notes,
                 "consent_terms": terms,
                 "consent_location": locationConsent,
-                "consent_parental": parentalConsent
+                "consent_parental": parentalConsent,
+                "consent_early_service": earlyService,
+                "use_subscription": usePackage && duration == 30
             ])
             onCreated()
         } catch {
@@ -774,6 +828,11 @@ private struct ProfileView: View {
 
     var body: some View {
         Form {
+            Section {
+                NavigationLink { ServicesView(role: user.role) } label: {
+                    Label(user.role == "admin" ? "Zarządzaj usługą i kontami" : "Pakiety, pomoc i dokumenty", systemImage: "square.grid.2x2.fill").font(.headline).padding(.vertical, 10)
+                }
+            }
             Section("Konto") {
                 Text(user.email)
                 LabeledContent("Rola", value: user.role == "client" ? "Klient" : (user.role == "admin" ? "Administrator" : "Opiekun"))
@@ -803,7 +862,8 @@ private struct ProfileView: View {
                 "first_name": firstName, "last_name": lastName,
                 "phone": phone, "address": address
             ])
-            message = "Profil zapisany. Zaloguj się ponownie, aby odświeżyć dane nagłówka."
+            try await session.reloadUser()
+            message = "Profil zapisany."
             await onChanged()
         } catch { message = error.localizedDescription }
     }
@@ -919,7 +979,7 @@ private struct WalkTrackingView: View {
                 .mapControlVisibility(.visible)
             }
             VStack(alignment: .leading, spacing: 8) {
-                Label(locationManager.statusMessage, systemImage: "location.fill")
+                Label(locationManager.isTracking ? locationManager.statusMessage : "Ostatni zapis: \(points.last?.text("timestamp") ?? "oczekiwanie na GPS")", systemImage: "location.fill")
                     .font(.footnote).foregroundStyle(locationManager.isTracking ? AppStyle.green : AppStyle.muted)
                 Text("Punktów trasy: \(points.count)").font(.caption).foregroundStyle(AppStyle.muted)
                 if let error { Text(error).font(.caption).foregroundStyle(.red) }
@@ -932,7 +992,12 @@ private struct WalkTrackingView: View {
         }
         .navigationTitle("Trasa spaceru")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await load() }
+        .task {
+            while !Task.isCancelled {
+                await load()
+                do { try await Task.sleep(for: .seconds(6)) } catch { break }
+            }
+        }
         .refreshable { await load() }
     }
 

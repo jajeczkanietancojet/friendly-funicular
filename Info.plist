@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>API_BASE_URL</key><string>$(API_BASE_URL)</string>
+  <key>NSLocationWhenInUseUsageDescription</key><string>Opiekun może udostępniać trasę GPS wyłącznie podczas aktywnego spaceru.</string>
+  <key>NSLocalNetworkUsageDescription</key><string>Połączenie z serwerem NaSpacerze w Twojej sieci lokalnej.</string>
+  <key>UIBackgroundModes</key><array><string>location</string></array>
+  <key>NSAppTransportSecurity</key><dict><key>NSAllowsArbitraryLoads</key><true/></dict>
+  <key>UILaunchScreen</key><dict/>
+  <key>UIApplicationSceneManifest</key><dict><key>UIApplicationSupportsMultipleScenes</key><false/></dict>
+</dict></plist>
